@@ -1,0 +1,18 @@
+---
+title: "Loss Data Analytics Notes"
+author: "Grant Donkervoet"
+format: html
+editor: visual
+---
+
+## Background
+
+I am redoing the loss data analytics course as a refresher on the basics of insurance analytics.
+
+## Goals
+
+-   Brush up on basics of insurance data
+
+-   Practice coding in both **R** and **Python**
+
+-   Learn something new that will improve effectiveness in job

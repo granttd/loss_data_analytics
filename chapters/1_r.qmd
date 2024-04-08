@@ -1,0 +1,32 @@
+---
+title: "Chapter 1"
+author: "Grant Donkervoet"
+format: html
+editor: visual
+---
+
+## Chapter 1 Exercises
+
+**Quiz Results:**
+
+-   1.1: 5/5
+
+-   
+
+## Packages for Analysis
+
+R:
+
+```{r}
+library(tidyverse)
+library(psych)
+```
+
+## EDA
+
+```{r}
+df_data<-read_csv("./data/PropertyFundInsample.csv")
+
+# summary stats
+df_data %>% describe()
+```
