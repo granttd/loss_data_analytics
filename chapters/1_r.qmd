@@ -5,13 +5,7 @@ format: html
 editor: visual
 ---
 
-## Chapter 1 Exercises
-
-**Quiz Results:**
-
--   1.1: 5/5
-
--   
+## 
 
 ## Packages for Analysis
 
@@ -20,13 +14,268 @@ R:
 ```{r}
 library(tidyverse)
 library(psych)
+library(here)
+library(janitor)
+```
+
+## Chapter 1 Exercises
+
+**Quiz Results:**
+
+-   1.1: 5/5
+
+-   1.2: 5/5
+
+-   1.3: 3/5
+
+## Data Imports & Clean
+
+```{r}
+df_data<-read_csv(here("data","PropertyFundInsample.csv"), na = ".") %>%
+  clean_names()
+
+# view
+glimpse(df_data)
+
 ```
 
 ## EDA
 
 ```{r}
-df_data<-read_csv("./data/PropertyFundInsample.csv")
 
 # summary stats
 df_data %>% describe()
+
+# summary stats of year 2010 frequency
+df_data %>%
+  filter(year==2010) %>%
+  tabyl(freq)
+
+# records, count of freq
+df_data %>%
+  group_by(year) %>%
+  summarise(count = n(),
+            avg_freq = mean(freq))
+
+# table of frequency of losses for year 2010
+df_data %>%
+  filter(year==2009) %>%
+  tabyl(freq)
+```
+
+```{r}
+# book example 2010
+
+df_data %>%
+  filter(year==2010) %>%
+  group_by(freq) %>%
+  summarize(pol_count = n()) %>%
+  ungroup() %>%
+  mutate(claims = freq * pol_count) -> iter_df
+
+iter_df %>%
+  mutate(proportion = pol_count / sum(iter_df$pol_count))->iter_df
+```
+
+### Table 1.3. Claims Summary by Policyholder
+
+```{r}
+df_data %>%
+ group_by(year) %>%
+  summarise(avg_freq = mean(freq),
+            avg_severity = mean(y_avg),
+            avg_coverage = mean(b_ccov),
+            num_policyholders = n())
+```
+
+```{r}
+df_data %>%
+  filter(year==2010) %>%
+  ggplot(aes(x=log(y_avg))) +
+    geom_histogram(color="blue", fill="white") +
+    ggtitle("2010 Log Average Severity")
+
+```
+
+### Table 1.4. Summary of Claim Frequency and Severity, Deductibles, and Coverages
+
+```{r}
+df_data %>%
+  select(freq, y_avg, deduct, b_ccov) %>%
+  mutate(b_ccov = b_ccov/1000) %>%
+  describe() %>%
+  select(n, min, median, mean, max)
+```
+
+### Table 1.6. Claims Summary by Entity Type, Fire Class, and No Claim Credit
+
+```{r}
+
+df_data_mod<-df_data %>%
+  rowwise() %>%
+  mutate(entity_type = case_when(type_city==1 ~ "city",
+                                 type_county==1 ~ "county",
+                                 type_misc==1 ~ "misc",
+                                 type_school==1 ~ "school",
+                                 type_town==1 ~ "town",
+                                 type_village==1 ~ "village"))
+
+# entity type view
+df_data_mod %>% group_by(entity_type, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(entity_type) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0) %>% group_by(entity_type) %>%
+      summarise(policies_w_loss = n()), by = "entity_type") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss)
+  
+# fire score
+df_data_mod %>% group_by(fire5, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(fire5) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0) %>% group_by(fire5) %>%
+      summarise(policies_w_loss = n()), by = "fire5") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss)
+
+# no claim credit
+df_data_mod %>% group_by(no_claim_credit, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(no_claim_credit) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0) %>% group_by(no_claim_credit) %>%
+      summarise(policies_w_loss = n()), by = "no_claim_credit") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss)
+
+
+# overall
+## policies
+dim(df_data_mod)[1]
+## frequency
+sum(df_data_mod$freq) / dim(df_data_mod)[1]
+## average severity
+sum(df_data_mod$y_avg) / dim(df_data_mod %>% filter(y_avg>0))[1]
+```
+
+### Table 1.7. **Claims Summary by Entity Type and Alarm Credit (AC) Category**
+
+```{r}
+# entity type view for AC00
+df_data_mod %>% 
+  filter(ac00==1) %>%
+  group_by(entity_type, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(entity_type) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0, ac00==1) %>% group_by(entity_type) %>%
+      summarise(policies_w_loss = n()), by = "entity_type") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss) %>%
+  rename_with(
+  ~ paste0(.x, "_ac00", recycle0 = TRUE),
+  !starts_with("entity_type"))->df_ac00_view
+
+# entity type view for AC05
+df_data_mod %>% 
+  filter(ac05==1) %>%
+  group_by(entity_type, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(entity_type) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0, ac05==1) %>% group_by(entity_type) %>%
+      summarise(policies_w_loss = n()), by = "entity_type") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss) %>%
+  rename_with(
+  ~ paste0(.x, "_ac05", recycle0 = TRUE),
+  !starts_with("entity_type"))->df_ac05_view
+
+# entity type view for AC10
+df_data_mod %>% 
+  filter(ac10==1) %>%
+  group_by(entity_type, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(entity_type) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0, ac10==1) %>% group_by(entity_type) %>%
+      summarise(policies_w_loss = n()), by = "entity_type") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss) %>%
+  rename_with(
+  ~ paste0(.x, "_ac10", recycle0 = TRUE),
+  !starts_with("entity_type"))->df_ac10_view
+
+# entity type view for AC15
+df_data_mod %>% 
+  filter(ac15==1) %>%
+  group_by(entity_type, freq) %>%
+  summarise(policies = n(),
+            total_loss = sum(y),
+            avg_loss = sum(y_avg)) %>%
+  mutate(claim_count = policies * freq) %>%
+  ungroup %>%
+  group_by(entity_type) %>%
+  summarise(policies = sum(policies),
+            claim_total = sum(claim_count),
+            avg_loss = sum(avg_loss)) %>%
+  left_join(
+    df_data_mod %>% filter(y_avg>0, ac15==1) %>% group_by(entity_type) %>%
+      summarise(policies_w_loss = n()), by = "entity_type") %>%
+  mutate(claim_freq = claim_total / policies,
+         avg_sev = avg_loss / policies_w_loss) %>%
+  rename_with(
+  ~ paste0(.x, "_ac15", recycle0 = TRUE),
+  !starts_with("entity_type"))->df_ac15_view
+
+df_ac_view<-df_ac00_view %>%
+  left_join(df_ac05_view, by="entity_type") %>%
+  left_join(df_ac10_view, by="entity_type") %>%
+  left_join(df_ac15_view, by="entity_type")
+
+glimpse(df_ac_view)
 ```
